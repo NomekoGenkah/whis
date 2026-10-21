@@ -145,12 +145,30 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  // --- Browser & Environment Detection ---
+  const isFirefox = /firefox/i.test(navigator.userAgent);
+
+  function getOptimalMimeType() {
+    const candidates = [
+      "audio/webm;codecs=opus",
+      "audio/ogg;codecs=opus",
+      "audio/webm",
+      "audio/ogg",
+    ];
+    for (const mime of candidates) {
+      if (window.MediaRecorder && MediaRecorder.isTypeSupported(mime)) {
+        return mime;
+      }
+    }
+    return "";
+  }
+
   // ==========================================
   // RF-01: Grabación Web con Web Audio API
   // ==========================================
   async function enumerateMicrophones() {
     if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
-      micSelect.innerHTML = `<option value="">Micrófono predeterminado</option>`;
+      micSelect.innerHTML = `<option value="">Dispositivo predeterminado</option>`;
       return;
     }
 
@@ -160,19 +178,23 @@ document.addEventListener("DOMContentLoaded", () => {
 
       micSelect.innerHTML = "";
       if (audioInputs.length === 0) {
-        micSelect.innerHTML = `<option value="">Micrófono predeterminado (o sin permiso)</option>`;
+        micSelect.innerHTML = `<option value="">Dispositivo predeterminado (o sin permiso)</option>`;
         return;
       }
 
       audioInputs.forEach((device, idx) => {
         const option = document.createElement("option");
         option.value = device.deviceId;
-        option.textContent = device.label || `Micrófono ${idx + 1}`;
+        let label = device.label || `Dispositivo ${idx + 1}`;
+        if (/monitor|stereo mix|mezcla|loopback/i.test(label)) {
+          label += " [AUDIO SISTEMA / MONITOR]";
+        }
+        option.textContent = label;
         micSelect.appendChild(option);
       });
     } catch (err) {
       console.warn("Error enumerating devices:", err);
-      micSelect.innerHTML = `<option value="">Micrófono predeterminado</option>`;
+      micSelect.innerHTML = `<option value="">Dispositivo predeterminado</option>`;
     }
   }
 
@@ -209,17 +231,19 @@ document.addEventListener("DOMContentLoaded", () => {
 
     downloadRawRecordBtn.addEventListener("click", () => {
       if (!recordedBlob) return;
+      const ext = recordedBlob.type && recordedBlob.type.includes("ogg") ? ".ogg" : ".webm";
       const url = URL.createObjectURL(recordedBlob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `recording_${new Date().toISOString().slice(0, 19).replace(/[-:T]/g, "")}.webm`;
+      a.download = `recording_${new Date().toISOString().slice(0, 19).replace(/[-:T]/g, "")}${ext}`;
       a.click();
       URL.revokeObjectURL(url);
     });
 
     transcribeRecordedBtn.addEventListener("click", () => {
       if (!recordedBlob) return;
-      const filename = `recording_${Date.now()}.webm`;
+      const ext = recordedBlob.type && recordedBlob.type.includes("ogg") ? ".ogg" : ".webm";
+      const filename = `recording_${Date.now()}${ext}`;
       const file = new File([recordedBlob], filename, { type: recordedBlob.type || "audio/webm" });
       sendToTranscribe(file);
     });
@@ -257,7 +281,7 @@ document.addEventListener("DOMContentLoaded", () => {
       recordedBlob = null;
       recordedChunks = [];
 
-      // 1. AudioContext
+      // 1. AudioContext (handles suspended state in Firefox/Chrome)
       const AudioCtxClass = window.AudioContext || window.webkitAudioContext;
       audioContext = new AudioCtxClass();
       if (audioContext.state === "suspended") {
@@ -265,12 +289,11 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       // 2. Nodes: Master Mixer Gain (1 in, 1 out) and Destination (1 in, 0 out)
-      // All sources connect to mixerNode. mixerNode connects to destinationNode AND analyserNode.
       const mixerNode = audioContext.createGain();
       const destinationNode = audioContext.createMediaStreamDestination();
       mixerNode.connect(destinationNode);
 
-      // 3. AnalyserNode for VU meter (connected from mixerNode, NOT destinationNode)
+      // 3. AnalyserNode for VU meter (connected from mixerNode)
       analyserNode = audioContext.createAnalyser();
       analyserNode.fftSize = 256;
       mixerNode.connect(analyserNode);
@@ -293,19 +316,15 @@ document.addEventListener("DOMContentLoaded", () => {
           showRecordNotice("Captura de pantalla no soportada en este entorno.");
         } else {
           try {
-            systemStream = await navigator.mediaDevices.getDisplayMedia({
-              video: {
-                displaySurface: "browser",
-              },
-              audio: {
-                echoCancellation: false,
-                noiseSuppression: false,
-                autoGainControl: false,
-              },
-              systemAudio: "include",
-            });
+            // Firefox only accepts simple boolean constraints: { video: true, audio: true }
+            const displayConstraints = {
+              video: true,
+              audio: true,
+            };
 
-            // Keep video track in stream but disable rendering to avoid browser tearing down the stream session
+            systemStream = await navigator.mediaDevices.getDisplayMedia(displayConstraints);
+
+            // In Chrome/Firefox, disable video rendering without killing stream
             systemStream.getVideoTracks().forEach(track => {
               track.enabled = false;
             });
@@ -321,12 +340,18 @@ document.addEventListener("DOMContentLoaded", () => {
                 console.info("Pista de audio del sistema finalizada.");
               });
             } else {
-              showRecordNotice(
-                "Aviso: No se detectó pista de audio del sistema. En Linux/Chrome, selecciona una 'Pestaña' y activa la casilla 'Compartir audio'. Continuando sólo con micrófono."
-              );
+              if (isFirefox) {
+                showRecordNotice(
+                  "Nota Firefox: Firefox no incluye audio vía compartir pantalla (Mozilla Bug #1541425). Para capturar el audio del sistema en Firefox, selecciona la fuente de monitoreo (ej. 'Monitor / Stereo Mix') en el selector de 'Dispositivo de Entrada'. Continuando con la grabación."
+                );
+              } else {
+                showRecordNotice(
+                  "Aviso: No se detectó pista de audio del sistema en la selección. Continuando con micrófono."
+                );
+              }
             }
           } catch (displayErr) {
-            console.warn("Captura de sistema omitida o cancelada:", displayErr);
+            console.warn("Captura de pantalla omitida o cancelada:", displayErr);
             showRecordNotice("Captura de pantalla omitida o cancelada. Grabando sólo micrófono.");
           }
         }
@@ -336,12 +361,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
       combinedStream = destinationNode.stream;
 
-      let mimeType = "audio/webm;codecs=opus";
-      if (!MediaRecorder.isTypeSupported(mimeType)) {
-        mimeType = MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "";
-      }
-
-      mediaRecorder = new MediaRecorder(combinedStream, mimeType ? { mimeType } : undefined);
+      const optimalMime = getOptimalMimeType();
+      mediaRecorder = new MediaRecorder(combinedStream, optimalMime ? { mimeType: optimalMime } : undefined);
 
       mediaRecorder.ondataavailable = (e) => {
         if (e.data && e.data.size > 0) {
@@ -350,7 +371,7 @@ document.addEventListener("DOMContentLoaded", () => {
       };
 
       mediaRecorder.onstop = () => {
-        const finalType = mediaRecorder.mimeType || "audio/webm";
+        const finalType = mediaRecorder.mimeType || optimalMime || "audio/webm";
         recordedBlob = new Blob(recordedChunks, { type: finalType });
         recordedAudioPreview.src = URL.createObjectURL(recordedBlob);
         postRecordPanel.style.display = "block";
