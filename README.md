@@ -67,13 +67,27 @@ pip install -r requirements.txt
 
 ### 3. Iniciar el servidor
 
-#### Modo Estándar (HTTP):
+#### Opción A: Con Docker & Docker Compose (Recomendado para servicio en producción)
+Puedes levantar Whis como un servicio en segundo plano con reinicio automático (`unless-stopped`):
+```bash
+# Construir y levantar el contenedor en segundo plano:
+docker compose up -d
+
+# Ver logs en tiempo real:
+docker compose logs -f
+
+# Detener el servicio:
+docker compose down
+```
+El contenedor se comunica con la GPU RTX 3050 y persiste automáticamente todas las grabaciones y transcripciones en `./data`.
+
+#### Opción B: Modo Nativo Estándar (HTTP)
 ```bash
 ./run.sh
 ```
 El servidor arrancará en `http://0.0.0.0:8000`.
 
-#### Modo Seguro (HTTPS con certificado autofirmado):
+#### Opción C: Modo Nativo Seguro (HTTPS con certificado autofirmado)
 ```bash
 ./run.sh --ssl
 ```

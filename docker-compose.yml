@@ -1,0 +1,26 @@
+services:
+  whis:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: whis
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      # Persistent recordings, transcripts and cached models
+      - ./data:/app/data
+      # NVIDIA host driver libraries passthrough for CUDA acceleration
+      - /usr/lib/x86_64-linux-gnu/libcuda.so.1:/usr/lib/x86_64-linux-gnu/libcuda.so.1:ro
+      - /usr/lib/x86_64-linux-gnu/libcuda.so:/usr/lib/x86_64-linux-gnu/libcuda.so:ro
+      - /usr/lib/x86_64-linux-gnu/libnvidia-ml.so.1:/usr/lib/x86_64-linux-gnu/libnvidia-ml.so.1:ro
+      - /usr/bin/nvidia-smi:/usr/bin/nvidia-smi:ro
+    devices:
+      - /dev/nvidia0:/dev/nvidia0
+      - /dev/nvidiactl:/dev/nvidiactl
+      - /dev/nvidia-uvm:/dev/nvidia-uvm
+      - /dev/nvidia-uvm-tools:/dev/nvidia-uvm-tools
+      - /dev/nvidia-modeset:/dev/nvidia-modeset
+    environment:
+      - PYTHONUNBUFFERED=1
+      - LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu
