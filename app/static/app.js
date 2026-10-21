@@ -1,13 +1,43 @@
 /**
  * Whis — Grabador Web y Transcriptor Local
- * Frontend Vanilla JS con Web Audio API, MediaRecorder y Fetch API.
+ * Frontend Vanilla JS con Web Audio API, MediaRecorder, Fetch API y Tema Claro/Oscuro.
  */
 
 document.addEventListener("DOMContentLoaded", () => {
+  // --- Theme Management ---
+  const htmlRoot = document.documentElement;
+  const themeToggleBtn = document.getElementById("themeToggleBtn");
+  const themeIconSlot = document.getElementById("themeIconSlot");
+  const themeLabel = document.getElementById("themeLabel");
+
+  const sunIcon = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>`;
+  const moonIcon = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>`;
+
+  function initTheme() {
+    const savedTheme = localStorage.getItem("whis-theme") || "dark";
+    setTheme(savedTheme);
+  }
+
+  function setTheme(theme) {
+    htmlRoot.setAttribute("data-theme", theme);
+    localStorage.setItem("whis-theme", theme);
+    if (theme === "dark") {
+      themeIconSlot.innerHTML = sunIcon;
+      themeLabel.textContent = "CLARO";
+    } else {
+      themeIconSlot.innerHTML = moonIcon;
+      themeLabel.textContent = "OSCURO";
+    }
+  }
+
+  themeToggleBtn.addEventListener("click", () => {
+    const currentTheme = htmlRoot.getAttribute("data-theme") || "dark";
+    setTheme(currentTheme === "dark" ? "light" : "dark");
+  });
+
+  initTheme();
+
   // --- DOM Elements ---
-  const serverStatusBadge = document.getElementById("serverStatusBadge");
-  const statusIndicator = document.getElementById("statusIndicator");
-  const statusText = document.getElementById("statusText");
   const securityWarning = document.getElementById("securityWarning");
 
   // Tabs
@@ -61,6 +91,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const timestampView = document.getElementById("timestampView");
   const showTimestampsCheck = document.getElementById("showTimestampsCheck");
   const copyTextBtn = document.getElementById("copyTextBtn");
+  const copyBtnText = document.getElementById("copyBtnText");
   const downloadButtons = document.getElementById("downloadButtons");
 
   // --- State Variables ---
@@ -80,45 +111,13 @@ document.addEventListener("DOMContentLoaded", () => {
   let processingTimerInterval = null;
   let currentResultData = null;
 
-  // --- Initialize ---
-  checkHealth();
+  // --- Initialize Components ---
   checkMediaPermissionsSupport();
   setupTabs();
   setupRecordingControls();
   setupUploadZone();
   setupResultView();
   fetchHistory();
-
-  // Periodically check health every 20 seconds
-  setInterval(checkHealth, 20000);
-
-  // ==========================================
-  // Health & Server Status
-  // ==========================================
-  async function checkHealth() {
-    try {
-      const res = await fetch("/api/health");
-      if (!res.ok) throw new Error("HTTP " + res.status);
-      const data = await res.json();
-
-      statusIndicator.className = "status-indicator online";
-      let label = "Online";
-      if (data.cuda_available) {
-        label += ` · GPU (${data.device_name || "CUDA"})`;
-      } else {
-        label += " · CPU";
-      }
-      if (data.loaded_model) {
-        label += ` [${data.loaded_model}]`;
-      }
-      statusText.textContent = label;
-      serverStatusBadge.title = `FFmpeg: ${data.ffmpeg_available ? "OK" : "No detectado"} | CUDA: ${data.cuda_available}`;
-    } catch (e) {
-      statusIndicator.className = "status-indicator offline";
-      statusText.textContent = "Desconectado";
-      serverStatusBadge.title = "No se puede conectar con el backend de Whis";
-    }
-  }
 
   function checkMediaPermissionsSupport() {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -155,7 +154,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     try {
-      // First ensure permission prompt has run or request devices
       const devices = await navigator.mediaDevices.enumerateDevices();
       const audioInputs = devices.filter(d => d.kind === "audioinput");
 
@@ -179,9 +177,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
   refreshDevicesBtn.addEventListener("click", async () => {
     refreshDevicesBtn.disabled = true;
-    refreshDevicesBtn.textContent = "🔄 Buscando...";
+    refreshDevicesBtn.innerHTML = `<span>BUSCANDO...</span>`;
     try {
-      // Try asking permission if labels are empty
       if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
         try {
           const tempStream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -191,11 +188,16 @@ document.addEventListener("DOMContentLoaded", () => {
       await enumerateMicrophones();
     } finally {
       refreshDevicesBtn.disabled = false;
-      refreshDevicesBtn.textContent = "🔄 Actualizar";
+      refreshDevicesBtn.innerHTML = `
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square">
+          <polyline points="23 4 23 10 17 10"/>
+          <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+        </svg>
+        <span>ACTUALIZAR</span>
+      `;
     }
   });
 
-  // Try initial enumeration
   enumerateMicrophones();
 
   function setupRecordingControls() {
@@ -209,7 +211,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const url = URL.createObjectURL(recordedBlob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `grabacion_${new Date().toISOString().slice(0, 19).replace(/[-:T]/g, "")}.webm`;
+      a.download = `recording_${new Date().toISOString().slice(0, 19).replace(/[-:T]/g, "")}.webm`;
       a.click();
       URL.revokeObjectURL(url);
     });
@@ -230,9 +232,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
   async function startRecording() {
     try {
-      // 1. Check browser capabilities
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        alert("Tu navegador no soporta grabación de audio en este origen HTTP. Revisa el aviso superior.");
+        alert("El navegador no soporta captura de audio en este origen HTTP.");
         return;
       }
 
@@ -240,7 +241,6 @@ document.addEventListener("DOMContentLoaded", () => {
       recordedBlob = null;
       recordedChunks = [];
 
-      // 2. Web Audio API Context
       const AudioCtxClass = window.AudioContext || window.webkitAudioContext;
       audioContext = new AudioCtxClass();
       if (audioContext.state === "suspended") {
@@ -249,23 +249,20 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const destinationNode = audioContext.createMediaStreamDestination();
 
-      // 3. Microphone stream
       const selectedMicId = micSelect.value;
       const micConstraints = {
         audio: selectedMicId ? { deviceId: { exact: selectedMicId } } : true,
       };
 
       micStream = await navigator.mediaDevices.getUserMedia(micConstraints);
-      // Re-enumerate to get device labels now that permission was granted
       enumerateMicrophones();
 
       const micSource = audioContext.createMediaStreamSource(micStream);
       micSource.connect(destinationNode);
 
-      // 4. System / Tab audio (if enabled)
       if (includeSystemAudio.checked) {
         if (!navigator.mediaDevices.getDisplayMedia) {
-          alert("La captura de audio de pantalla/pestaña no está soportada en este navegador.");
+          alert("Captura de pantalla no soportada en este entorno.");
         } else {
           try {
             systemStream = await navigator.mediaDevices.getDisplayMedia({
@@ -273,7 +270,6 @@ document.addEventListener("DOMContentLoaded", () => {
               audio: true,
             });
 
-            // Discard video track immediately to save CPU/memory
             systemStream.getVideoTracks().forEach(track => track.stop());
 
             const systemAudioTracks = systemStream.getAudioTracks();
@@ -283,27 +279,23 @@ document.addEventListener("DOMContentLoaded", () => {
               );
               systemSource.connect(destinationNode);
 
-              // Listen for when user stops sharing tab/screen from browser banner
               systemAudioTracks[0].addEventListener("ended", () => {
-                console.info("Pista de audio del sistema detenida por el usuario.");
+                console.info("Pista de audio del sistema finalizada.");
               });
             } else {
-              alert("Aviso: No se seleccionó la opción 'Compartir audio' en la ventana de captura. Solo se grabará el micrófono.");
+              alert("Aviso: No se seleccionó 'Compartir audio' en el diálogo. Solo se capturará el micrófono.");
             }
           } catch (displayErr) {
-            console.warn("Captura de pantalla cancelada o denegada:", displayErr);
-            // Continue recording with mic only
+            console.warn("Captura de sistema omitida:", displayErr);
           }
         }
       }
 
-      // 5. Setup Analyser for VU Meter
       analyserNode = audioContext.createAnalyser();
       analyserNode.fftSize = 256;
       destinationNode.connect(analyserNode);
       startVuMeter();
 
-      // 6. Setup MediaRecorder with combined audio stream
       combinedStream = destinationNode.stream;
 
       let mimeType = "audio/webm;codecs=opus";
@@ -326,18 +318,15 @@ document.addEventListener("DOMContentLoaded", () => {
         postRecordPanel.style.display = "block";
       };
 
-      // Start recording with 1 second timeslice
       mediaRecorder.start(1000);
 
-      // UI state
       startRecordBtn.style.display = "none";
       pauseRecordBtn.style.display = "inline-flex";
       resumeRecordBtn.style.display = "none";
       stopRecordBtn.style.display = "inline-flex";
       recordingBadge.className = "recording-state-badge active";
-      recordingBadge.textContent = "Grabando...";
+      recordingBadge.textContent = "REC";
 
-      // Timer
       recordSeconds = 0;
       updateTimerDisplay();
       recordTimerInterval = setInterval(() => {
@@ -359,7 +348,7 @@ document.addEventListener("DOMContentLoaded", () => {
       pauseRecordBtn.style.display = "none";
       resumeRecordBtn.style.display = "inline-flex";
       recordingBadge.className = "recording-state-badge paused";
-      recordingBadge.textContent = "Pausado";
+      recordingBadge.textContent = "PAUSED";
     }
   }
 
@@ -373,7 +362,7 @@ document.addEventListener("DOMContentLoaded", () => {
       resumeRecordBtn.style.display = "none";
       pauseRecordBtn.style.display = "inline-flex";
       recordingBadge.className = "recording-state-badge active";
-      recordingBadge.textContent = "Grabando...";
+      recordingBadge.textContent = "REC";
     }
   }
 
@@ -385,13 +374,12 @@ document.addEventListener("DOMContentLoaded", () => {
     stopVuMeter();
     cleanupAudioTracks();
 
-    // UI state
     startRecordBtn.style.display = "inline-flex";
     pauseRecordBtn.style.display = "none";
     resumeRecordBtn.style.display = "none";
     stopRecordBtn.style.display = "none";
     recordingBadge.className = "recording-state-badge";
-    recordingBadge.textContent = "Completado";
+    recordingBadge.textContent = "DONE";
   }
 
   function resetRecordingState() {
@@ -402,7 +390,7 @@ document.addEventListener("DOMContentLoaded", () => {
     recordedAudioPreview.src = "";
     recordSeconds = 0;
     updateTimerDisplay();
-    recordingBadge.textContent = "Inactivo";
+    recordingBadge.textContent = "STANDBY";
     vuMeterBar.style.width = "0%";
   }
 
@@ -448,7 +436,6 @@ document.addEventListener("DOMContentLoaded", () => {
         sum += dataArray[i];
       }
       const average = sum / dataArray.length;
-      // Map 0-255 to percentage with a slight boost for visual sensitivity
       const percentage = Math.min(100, Math.round((average / 128) * 100));
       vuMeterBar.style.width = `${percentage}%`;
       vuMeterAnimId = requestAnimationFrame(draw);
@@ -532,12 +519,10 @@ document.addEventListener("DOMContentLoaded", () => {
   // Transcripción y Comunicación con API
   // ==========================================
   async function sendToTranscribe(file) {
-    // Show processing banner
     resultCard.style.display = "none";
     processingCard.style.display = "flex";
     processingStatusText.textContent = `Extrayendo audio con FFmpeg y transcribiendo (${modelSelect.value})...`;
     
-    // Start processing timer
     let procSeconds = 0;
     processingTimer.textContent = "00:00";
     clearInterval(processingTimerInterval);
@@ -548,7 +533,6 @@ document.addEventListener("DOMContentLoaded", () => {
       processingTimer.textContent = `${m}:${s}`;
     }, 1000);
 
-    // Prepare FormData
     const formData = new FormData();
     formData.append("file", file);
     formData.append("model", modelSelect.value);
@@ -574,7 +558,6 @@ document.addEventListener("DOMContentLoaded", () => {
       const data = await response.json();
       displayResult(data);
       fetchHistory();
-      checkHealth();
     } catch (err) {
       console.error("Error al procesar transcripción:", err);
       alert(`Error al procesar la transcripción:\n${err.message}`);
@@ -609,10 +592,9 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       navigator.clipboard.writeText(textToCopy).then(() => {
-        const origText = copyTextBtn.textContent;
-        copyTextBtn.textContent = "✅ ¡Copiado!";
+        copyBtnText.textContent = "COPIADO";
         setTimeout(() => {
-          copyTextBtn.textContent = origText;
+          copyBtnText.textContent = "COPIAR TODO";
         }, 2000);
       }).catch(err => {
         alert("No se pudo copiar al portapapeles: " + err);
@@ -624,19 +606,16 @@ document.addEventListener("DOMContentLoaded", () => {
     currentResultData = data;
     resultCard.style.display = "block";
 
-    // Meta details
     const durMin = (data.duration_seconds / 60).toFixed(1);
     resultMeta.innerHTML = `
       <span class="result-meta-item">ID: <strong>${data.id}</strong></span>
-      <span class="result-meta-item">Idioma: <strong>${(data.language || "es").toUpperCase()}</strong></span>
-      <span class="result-meta-item">Duración audio: <strong>${data.duration_seconds}s (${durMin} min)</strong></span>
-      <span class="result-meta-item">Procesado en: <strong>${data.processing_time_seconds}s</strong></span>
+      <span class="result-meta-item">LANG: <strong>${(data.language || "es").toUpperCase()}</strong></span>
+      <span class="result-meta-item">DURACION: <strong>${data.duration_seconds}s (${durMin}m)</strong></span>
+      <span class="result-meta-item">TIEMPO GPU: <strong>${data.processing_time_seconds}s</strong></span>
     `;
 
-    // Plain text view
-    plainTextView.textContent = data.text || "(Transcripción vacía o solo silencio)";
+    plainTextView.textContent = data.text || "(Sin texto detectado o solo silencio)";
 
-    // Timestamp view
     timestampView.innerHTML = "";
     if (data.segments && data.segments.length > 0) {
       data.segments.forEach(seg => {
@@ -649,41 +628,41 @@ document.addEventListener("DOMContentLoaded", () => {
         timestampView.appendChild(row);
       });
     } else {
-      timestampView.innerHTML = `<p class="empty-state">No se registraron marcas de tiempo.</p>`;
+      timestampView.innerHTML = `<p class="empty-state">SIN MARCAS DE TIEMPO REGISTRADAS</p>`;
     }
 
-    // Toggle default to plain text
     showTimestampsCheck.checked = false;
     plainTextView.style.display = "block";
     timestampView.style.display = "none";
 
-    // Download buttons
     downloadButtons.innerHTML = "";
     if (data.downloads) {
       if (data.downloads.txt) {
         downloadButtons.innerHTML += `
           <a href="${data.downloads.txt}" class="btn btn-secondary btn-sm" download>
-            📄 Descargar .TXT
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square"><path d="M21 15v4H3v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            <span>.TXT</span>
           </a>
         `;
       }
       if (data.downloads.srt) {
         downloadButtons.innerHTML += `
           <a href="${data.downloads.srt}" class="btn btn-secondary btn-sm" download>
-            📝 Descargar .SRT
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square"><path d="M21 15v4H3v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            <span>.SRT</span>
           </a>
         `;
       }
       if (data.downloads.mp3) {
         downloadButtons.innerHTML += `
           <a href="${data.downloads.mp3}" class="btn btn-secondary btn-sm" download>
-            🎵 Descargar .MP3
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square"><path d="M21 15v4H3v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            <span>.MP3</span>
           </a>
         `;
       }
     }
 
-    // Smooth scroll to result
     resultCard.scrollIntoView({ behavior: "smooth" });
   }
 
@@ -718,7 +697,7 @@ document.addEventListener("DOMContentLoaded", () => {
       historyCount.textContent = historyItems.length;
 
       if (historyItems.length === 0) {
-        historyList.innerHTML = `<p class="empty-state">No hay grabaciones o transcripciones previas.</p>`;
+        historyList.innerHTML = `<p class="empty-state">NO HAY SESIONES REGISTRADAS</p>`;
         return;
       }
 
@@ -733,13 +712,13 @@ document.addEventListener("DOMContentLoaded", () => {
         let downloadLinksHtml = "";
         if (item.downloads) {
           if (item.downloads.txt) {
-            downloadLinksHtml += `<a href="${item.downloads.txt}" class="btn btn-ghost btn-sm" download title="Descargar texto">📄 .txt</a>`;
+            downloadLinksHtml += `<a href="${item.downloads.txt}" class="btn btn-ghost btn-sm" download title="Descargar texto">.TXT</a>`;
           }
           if (item.downloads.srt) {
-            downloadLinksHtml += `<a href="${item.downloads.srt}" class="btn btn-ghost btn-sm" download title="Descargar subtítulos">📝 .srt</a>`;
+            downloadLinksHtml += `<a href="${item.downloads.srt}" class="btn btn-ghost btn-sm" download title="Descargar subtítulos">.SRT</a>`;
           }
           if (item.downloads.mp3) {
-            downloadLinksHtml += `<a href="${item.downloads.mp3}" class="btn btn-ghost btn-sm" download title="Descargar audio">🎵 .mp3</a>`;
+            downloadLinksHtml += `<a href="${item.downloads.mp3}" class="btn btn-ghost btn-sm" download title="Descargar audio">.MP3</a>`;
           }
         }
 
@@ -755,7 +734,7 @@ document.addEventListener("DOMContentLoaded", () => {
           <div class="history-item-preview">${escapeHtml(item.preview || item.text || "(Sin texto)")}</div>
           <div class="history-item-actions">
             ${downloadLinksHtml}
-            <button class="btn btn-secondary btn-sm view-history-btn">Ver en visor</button>
+            <button class="btn btn-secondary btn-sm view-history-btn">VER</button>
           </div>
         `;
 

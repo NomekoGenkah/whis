@@ -1,59 +1,92 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" data-theme="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Whis — Grabador Web y Transcriptor Local</title>
   <link rel="stylesheet" href="styles.css">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎙️</text></svg>">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%23000'/><circle cx='50' cy='50' r='30' fill='%23fff'/></svg>">
 </head>
-<body class="dark-theme">
+<body>
   <div class="app-container">
     <!-- Header -->
     <header class="header">
       <div class="brand">
-        <span class="logo-icon">🎙️</span>
-        <div>
-          <h1>Whis</h1>
-          <p class="tagline">Grabador Web & Transcripción Local (Faster-Whisper)</p>
+        <div class="brand-mark">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="square">
+            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+            <line x1="12" y1="19" x2="12" y2="23"/>
+            <line x1="8" y1="23" x2="16" y2="23"/>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <h1>WHIS</h1>
+          <span class="brand-sub">LOCAL ENGINE / FASTER-WHISPER</span>
         </div>
       </div>
-      <div class="server-status" id="serverStatusBadge">
-        <span class="status-indicator" id="statusIndicator"></span>
-        <span id="statusText">Conectando...</span>
+
+      <div class="header-actions">
+        <button type="button" class="btn btn-secondary btn-sm" id="themeToggleBtn" aria-label="Cambiar tema">
+          <span class="theme-icon-slot" id="themeIconSlot"></span>
+          <span class="theme-label" id="themeLabel">TEMA</span>
+        </button>
       </div>
     </header>
 
     <!-- HTTPS / Insecure origin warning banner (hidden by default) -->
     <div class="banner warning-banner" id="securityWarning" style="display: none;">
-      <span class="banner-icon">⚠️</span>
+      <div class="banner-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square">
+          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+          <line x1="12" y1="9" x2="12" y2="13"/>
+          <line x1="12" y1="17" x2="12.01" y2="17"/>
+        </svg>
+      </div>
       <div class="banner-content">
-        <strong>Permisos de Micrófono no disponibles:</strong> El navegador bloquea el acceso a audio en orígenes HTTP en red local.
-        <br>Para solucionarlo: En Chrome/Brave/Edge abre <code>chrome://flags/#unsafely-treat-insecure-origin-as-secure</code>, añade la URL de este servidor y reinicia el navegador, o inicia con HTTPS (<code>./run.sh --ssl</code>).
+        <strong>Acceso a micrófono restringido:</strong> El navegador bloquea la captura de audio en orígenes HTTP en red local.
+        <br>Accede mediante HTTPS seguro en <code>https://192.168.1.10/</code> (vía Caddy local) o habilita <code>chrome://flags/#unsafely-treat-insecure-origin-as-secure</code>.
       </div>
     </div>
 
     <!-- Main Navigation Tabs -->
-    <nav class="nav-tabs">
-      <button class="tab-btn active" data-tab="record-tab">
-        <span class="tab-icon">🎙️</span> Grabar Ahora
+    <nav class="nav-tabs" role="tablist">
+      <button class="tab-btn active" data-tab="record-tab" role="tab">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square">
+          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+          <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+          <line x1="12" y1="19" x2="12" y2="23"/>
+          <line x1="8" y1="23" x2="16" y2="23"/>
+        </svg>
+        <span>GRABAR EN VIVO</span>
       </button>
-      <button class="tab-btn" data-tab="upload-tab">
-        <span class="tab-icon">📁</span> Subir Archivo
+      <button class="tab-btn" data-tab="upload-tab" role="tab">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square">
+          <path d="M21 15v4H3v-4"/>
+          <polyline points="17 8 12 3 7 8"/>
+          <line x1="12" y1="3" x2="12" y2="15"/>
+        </svg>
+        <span>SUBIR ARCHIVO</span>
       </button>
-      <button class="tab-btn" data-tab="history-tab">
-        <span class="tab-icon">🕒</span> Historial (<span id="historyCount">0</span>)
+      <button class="tab-btn" data-tab="history-tab" role="tab">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square">
+          <circle cx="12" cy="12" r="10"/>
+          <polyline points="12 6 12 12 16 14"/>
+        </svg>
+        <span>HISTORIAL [<span id="historyCount">0</span>]</span>
       </button>
     </nav>
 
     <!-- Global Transcription Settings Card -->
     <section class="card settings-card">
-      <h2 class="card-title">⚙️ Parámetros de Transcripción</h2>
+      <div class="card-header-bar">
+        <span class="card-label">CONFIGURACION DE MOTOR</span>
+      </div>
       <div class="settings-grid">
         <div class="field-group">
-          <label for="modelSelect">Modelo Whisper:</label>
+          <label for="modelSelect">MODELO</label>
           <select id="modelSelect">
-            <option value="turbo" selected>Turbo (large-v3-turbo, recomendado GPU)</option>
+            <option value="turbo" selected>Turbo (large-v3-turbo / GPU)</option>
             <option value="medium">Medium</option>
             <option value="small">Small</option>
             <option value="base">Base</option>
@@ -61,7 +94,7 @@
         </div>
 
         <div class="field-group">
-          <label for="langSelect">Idioma:</label>
+          <label for="langSelect">IDIOMA</label>
           <select id="langSelect">
             <option value="es" selected>Español (es)</option>
             <option value="en">Inglés (en)</option>
@@ -72,10 +105,12 @@
         <div class="field-group checkboxes-group">
           <label class="checkbox-label" title="Usa Silero VAD para ignorar silencios y reducir alucinaciones">
             <input type="checkbox" id="vadFilterCheck" checked>
+            <span class="custom-checkbox"></span>
             <span>Filtro de silencios (VAD)</span>
           </label>
           <label class="checkbox-label" title="Conserva el archivo MP3 a 16kHz en el servidor para descarga">
             <input type="checkbox" id="keepMp3Check" checked>
+            <span class="custom-checkbox"></span>
             <span>Conservar copia en MP3</span>
           </label>
         </div>
@@ -85,18 +120,24 @@
     <!-- Tab 1: Live Recording -->
     <section class="tab-content active" id="record-tab">
       <div class="card">
-        <h2 class="card-title">🎙️ Grabación en Vivo con Mezcla de Audio</h2>
-        
+        <div class="card-header-bar">
+          <span class="card-label">CAPTURA Y MEZCLA DE AUDIO</span>
+        </div>
+
         <div class="record-controls-config">
           <div class="device-row">
             <div class="device-select-wrap">
-              <label for="micSelect">Micrófono:</label>
+              <label for="micSelect">DISPOSITIVO DE ENTRADA</label>
               <div class="select-with-btn">
                 <select id="micSelect">
-                  <option value="">Detectando micrófonos...</option>
+                  <option value="">Buscando dispositivos...</option>
                 </select>
                 <button type="button" class="btn btn-secondary" id="refreshDevicesBtn" title="Actualizar lista de dispositivos">
-                  🔄 Actualizar
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square">
+                    <polyline points="23 4 23 10 17 10"/>
+                    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                  </svg>
+                  <span>ACTUALIZAR</span>
                 </button>
               </div>
             </div>
@@ -104,57 +145,86 @@
             <div class="system-audio-toggle">
               <label class="toggle-container">
                 <input type="checkbox" id="includeSystemAudio">
-                <span class="toggle-slider"></span>
-                <span class="toggle-label">🔊 Incluir Audio del Sistema / Pestaña</span>
+                <span class="toggle-square"></span>
+                <span class="toggle-label">MEZCLAR AUDIO DEL SISTEMA / PESTAÑA</span>
               </label>
-              <small class="help-text">Al grabar, se pedirá seleccionar qué pantalla/pestaña compartir con audio.</small>
+              <span class="help-text">Captura la reunión o video junto con tu voz en una sola pista.</span>
             </div>
           </div>
         </div>
 
         <!-- VU Meter and Live Timer -->
         <div class="recording-monitor">
-          <div class="timer-display" id="recordTimer">00:00:00</div>
-          
+          <div class="monitor-left">
+            <span class="monitor-label">TIEMPO</span>
+            <div class="timer-display" id="recordTimer">00:00:00</div>
+          </div>
+
           <div class="vumeter-container">
-            <div class="vumeter-label">Nivel de entrada (Vúmetro):</div>
-            <div class="vumeter-bar-wrap">
+            <div class="vumeter-header">
+              <span class="monitor-label">NIVEL DE ENTRADA</span>
+              <span class="recording-state-badge" id="recordingBadge">STANDBY</span>
+            </div>
+            <div class="vumeter-track">
               <div class="vumeter-bar" id="vuMeterBar"></div>
             </div>
           </div>
-
-          <div class="recording-state-badge" id="recordingBadge">Inactivo</div>
         </div>
 
         <!-- Action buttons -->
         <div class="record-actions">
-          <button class="btn btn-danger btn-lg" id="startRecordBtn">
-            <span class="btn-icon">⏺️</span> Iniciar Grabación
+          <button class="btn btn-primary btn-lg" id="startRecordBtn">
+            <span class="status-dot rec-dot"></span>
+            <span>INICIAR GRABACION</span>
           </button>
-          <button class="btn btn-warning btn-lg" id="pauseRecordBtn" style="display: none;">
-            <span class="btn-icon">⏸️</span> Pausar
+          <button class="btn btn-secondary btn-lg" id="pauseRecordBtn" style="display: none;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+              <rect x="6" y="4" width="4" height="16"/>
+              <rect x="14" y="4" width="4" height="16"/>
+            </svg>
+            <span>PAUSAR</span>
           </button>
           <button class="btn btn-primary btn-lg" id="resumeRecordBtn" style="display: none;">
-            <span class="btn-icon">▶️</span> Reanudar
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+              <polygon points="6,4 20,12 6,20"/>
+            </svg>
+            <span>REANUDAR</span>
           </button>
-          <button class="btn btn-dark btn-lg" id="stopRecordBtn" style="display: none;">
-            <span class="btn-icon">⏹️</span> Detener Grabación
+          <button class="btn btn-danger btn-lg" id="stopRecordBtn" style="display: none;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+              <rect x="4" y="4" width="16" height="16"/>
+            </svg>
+            <span>DETENER</span>
           </button>
         </div>
 
         <!-- Post-recording preview & send card -->
         <div class="post-recording-panel" id="postRecordPanel" style="display: none;">
-          <h3>✅ Grabación Finalizada</h3>
+          <div class="panel-header-inline">
+            <span class="monitor-label">VISTA PREVIA DE CAPTURA</span>
+          </div>
           <audio id="recordedAudioPreview" controls class="audio-player"></audio>
           <div class="post-record-actions">
             <button class="btn btn-secondary" id="downloadRawRecordBtn">
-              💾 Descargar Audio Grabado (.webm)
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square">
+                <path d="M21 15v4H3v-4"/>
+                <polyline points="7 10 12 15 17 10"/>
+                <line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
+              <span>DESCARGAR .WEBM</span>
             </button>
-            <button class="btn btn-success btn-lg" id="transcribeRecordedBtn">
-              ⚡ Transcribir Audio Ahora
+            <button class="btn btn-primary btn-lg" id="transcribeRecordedBtn">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+              </svg>
+              <span>TRANSCRIBIR AHORA</span>
             </button>
             <button class="btn btn-ghost" id="discardRecordBtn">
-              🗑️ Descartar
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square">
+                <polyline points="3 6 5 6 21 6"/>
+                <path d="M19 6v14H5V6m3 0V4h8v2"/>
+              </svg>
+              <span>DESCARTAR</span>
             </button>
           </div>
         </div>
@@ -164,32 +234,50 @@
     <!-- Tab 2: File Upload -->
     <section class="tab-content" id="upload-tab">
       <div class="card">
-        <h2 class="card-title">📁 Subir Archivo Multimedia</h2>
-        <p class="section-subtitle">Acepta archivos de video o audio: <code>.mp4</code>, <code>.mkv</code>, <code>.mov</code>, <code>.webm</code>, <code>.mp3</code>, <code>.wav</code>, <code>.m4a</code>, <code>.ogg</code></p>
+        <div class="card-header-bar">
+          <span class="card-label">CARGA DE ARCHIVO LOCAL</span>
+        </div>
+        <p class="section-subtitle">Formatos soportados: <code>.mp4</code>, <code>.mkv</code>, <code>.mov</code>, <code>.webm</code>, <code>.mp3</code>, <code>.wav</code>, <code>.m4a</code>, <code>.ogg</code></p>
         
         <div class="dropzone" id="dropzone">
           <input type="file" id="fileInput" accept=".mp4,.mkv,.mov,.webm,.mp3,.wav,.m4a,.ogg,audio/*,video/*" hidden>
           <div class="dropzone-content">
-            <span class="dropzone-icon">📤</span>
-            <p class="dropzone-prompt">Arrastra y suelta tu archivo aquí o <span class="browse-link">haz clic para examinar</span></p>
-            <span class="dropzone-hint">FFmpeg extraerá y normalizará el audio automáticamente.</span>
+            <div class="dropzone-icon">
+              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="square">
+                <path d="M21 15v4H3v-4"/>
+                <polyline points="17 8 12 3 7 8"/>
+                <line x1="12" y1="3" x2="12" y2="15"/>
+              </svg>
+            </div>
+            <p class="dropzone-prompt">ARRASTRA UN ARCHIVO O <span class="browse-link">EXAMINA EL DISCO</span></p>
+            <span class="dropzone-hint">Extracción y normalización a MP3 16kHz automática mediante FFmpeg.</span>
           </div>
         </div>
 
         <div class="selected-file-info" id="selectedFileInfo" style="display: none;">
           <div class="file-details">
-            <span class="file-icon">🎵</span>
+            <div class="file-icon-box">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+                <line x1="16" y1="13" x2="8" y2="13"/>
+                <line x1="16" y1="17" x2="8" y2="17"/>
+              </svg>
+            </div>
             <div>
               <div class="file-name" id="fileNameLabel">-</div>
               <div class="file-size" id="fileSizeLabel">-</div>
             </div>
           </div>
           <div class="file-actions">
-            <button class="btn btn-success btn-lg" id="transcribeUploadedBtn">
-              ⚡ Transcribir Archivo
+            <button class="btn btn-primary btn-lg" id="transcribeUploadedBtn">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+              </svg>
+              <span>TRANSCRIBIR ARCHIVO</span>
             </button>
             <button class="btn btn-ghost" id="clearFileBtn">
-              ✕ Quitar
+              <span>QUITAR</span>
             </button>
           </div>
         </div>
@@ -200,23 +288,29 @@
     <section class="tab-content" id="history-tab">
       <div class="card">
         <div class="history-header">
-          <h2 class="card-title">🕒 Historial de Transcripciones Recientes</h2>
-          <button class="btn btn-secondary btn-sm" id="refreshHistoryBtn">🔄 Actualizar</button>
+          <div class="card-header-bar">
+            <span class="card-label">HISTORIAL DE SESIONES LOCALES</span>
+          </div>
+          <button class="btn btn-secondary btn-sm" id="refreshHistoryBtn">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square">
+              <polyline points="23 4 23 10 17 10"/>
+              <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+            </svg>
+            <span>ACTUALIZAR</span>
+          </button>
         </div>
         <div id="historyList" class="history-list">
-          <p class="empty-state">Cargando historial...</p>
+          <p class="empty-state">CARGANDO SESIONES...</p>
         </div>
       </div>
     </section>
 
     <!-- Processing Progress State Overlay / Banner -->
     <div class="processing-card card" id="processingCard" style="display: none;">
-      <div class="spinner-wrap">
-        <div class="spinner"></div>
-      </div>
+      <div class="spinner-square"></div>
       <div class="processing-details">
-        <h3>Transcribiendo en el servidor local...</h3>
-        <p id="processingStatusText">Procesando audio y ejecutando Faster-Whisper. Por favor espera.</p>
+        <div class="processing-title">PROCESANDO EN SERVIDOR LOCAL</div>
+        <p id="processingStatusText">Ejecutando inferencia en GPU Faster-Whisper. Por favor espera.</p>
         <div class="processing-timer" id="processingTimer">00:00</div>
       </div>
     </div>
@@ -225,20 +319,26 @@
     <section class="card result-card" id="resultCard" style="display: none;">
       <div class="result-header">
         <div>
-          <h2 class="card-title">📄 Resultado de la Transcripción</h2>
+          <div class="card-header-bar">
+            <span class="card-label">TRANSCRIPCION FINALIZADA</span>
+          </div>
           <div class="result-meta" id="resultMeta">
-            <!-- Populated via JS: Duración, Tiempo de cómputo, Idioma -->
+            <!-- Populated via JS -->
           </div>
         </div>
         <div class="result-toolbar">
-          <button class="btn btn-secondary" id="copyTextBtn">
-            📋 Copiar todo
+          <button class="btn btn-secondary btn-sm" id="copyTextBtn">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square">
+              <rect x="9" y="9" width="13" height="13"/>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+            </svg>
+            <span id="copyBtnText">COPIAR TODO</span>
           </button>
           <div class="view-mode-toggle">
             <label class="toggle-container">
               <input type="checkbox" id="showTimestampsCheck">
-              <span class="toggle-slider"></span>
-              <span class="toggle-label">Marcas de tiempo</span>
+              <span class="toggle-square"></span>
+              <span class="toggle-label">TIMESTAMPS</span>
             </label>
           </div>
         </div>
@@ -246,13 +346,13 @@
 
       <!-- Text viewer -->
       <div class="transcription-body">
-        <div id="plainTextView" class="transcription-text" contenteditable="true"></div>
+        <div id="plainTextView" class="transcription-text" contenteditable="true" spellcheck="false"></div>
         <div id="timestampView" class="transcription-timestamps" style="display: none;"></div>
       </div>
 
       <!-- Export / Download Bar -->
       <div class="download-bar">
-        <span class="download-title">Descargas directas:</span>
+        <span class="download-title">DESCARGAS:</span>
         <div class="download-buttons" id="downloadButtons">
           <!-- Buttons dynamically filled -->
         </div>

@@ -8,6 +8,8 @@ services:
     ports:
       - "8000:8000"
     volumes:
+      # Code mount for instant updates
+      - ./app:/app/app:ro
       # Persistent recordings, transcripts and cached models
       - ./data:/app/data
       # NVIDIA host driver libraries passthrough for CUDA acceleration
