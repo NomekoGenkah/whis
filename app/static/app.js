@@ -57,6 +57,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const recordTimer = document.getElementById("recordTimer");
   const vuMeterBar = document.getElementById("vuMeterBar");
   const recordingBadge = document.getElementById("recordingBadge");
+  const recordNotice = document.getElementById("recordNotice");
   const startRecordBtn = document.getElementById("startRecordBtn");
   const pauseRecordBtn = document.getElementById("pauseRecordBtn");
   const resumeRecordBtn = document.getElementById("resumeRecordBtn");
@@ -230,25 +231,51 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  function showRecordNotice(msg) {
+    if (recordNotice) {
+      recordNotice.textContent = msg;
+      recordNotice.style.display = "block";
+    }
+  }
+
+  function hideRecordNotice() {
+    if (recordNotice) {
+      recordNotice.style.display = "none";
+      recordNotice.textContent = "";
+    }
+  }
+
   async function startRecording() {
     try {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        alert("El navegador no soporta captura de audio en este origen HTTP.");
+        showRecordNotice("El navegador no soporta captura de audio en este origen HTTP.");
         return;
       }
 
+      hideRecordNotice();
       postRecordPanel.style.display = "none";
       recordedBlob = null;
       recordedChunks = [];
 
+      // 1. AudioContext
       const AudioCtxClass = window.AudioContext || window.webkitAudioContext;
       audioContext = new AudioCtxClass();
       if (audioContext.state === "suspended") {
         await audioContext.resume();
       }
 
+      // 2. Nodes: Master Mixer Gain (1 in, 1 out) and Destination (1 in, 0 out)
+      // All sources connect to mixerNode. mixerNode connects to destinationNode AND analyserNode.
+      const mixerNode = audioContext.createGain();
       const destinationNode = audioContext.createMediaStreamDestination();
+      mixerNode.connect(destinationNode);
 
+      // 3. AnalyserNode for VU meter (connected from mixerNode, NOT destinationNode)
+      analyserNode = audioContext.createAnalyser();
+      analyserNode.fftSize = 256;
+      mixerNode.connect(analyserNode);
+
+      // 4. Microphone stream
       const selectedMicId = micSelect.value;
       const micConstraints = {
         audio: selectedMicId ? { deviceId: { exact: selectedMicId } } : true,
@@ -258,42 +285,53 @@ document.addEventListener("DOMContentLoaded", () => {
       enumerateMicrophones();
 
       const micSource = audioContext.createMediaStreamSource(micStream);
-      micSource.connect(destinationNode);
+      micSource.connect(mixerNode);
 
+      // 5. System Audio (if selected)
       if (includeSystemAudio.checked) {
         if (!navigator.mediaDevices.getDisplayMedia) {
-          alert("Captura de pantalla no soportada en este entorno.");
+          showRecordNotice("Captura de pantalla no soportada en este entorno.");
         } else {
           try {
             systemStream = await navigator.mediaDevices.getDisplayMedia({
-              video: true,
-              audio: true,
+              video: {
+                displaySurface: "browser",
+              },
+              audio: {
+                echoCancellation: false,
+                noiseSuppression: false,
+                autoGainControl: false,
+              },
+              systemAudio: "include",
             });
 
-            systemStream.getVideoTracks().forEach(track => track.stop());
+            // Keep video track in stream but disable rendering to avoid browser tearing down the stream session
+            systemStream.getVideoTracks().forEach(track => {
+              track.enabled = false;
+            });
 
             const systemAudioTracks = systemStream.getAudioTracks();
             if (systemAudioTracks.length > 0) {
               const systemSource = audioContext.createMediaStreamSource(
-                new MediaStream(systemAudioTracks)
+                new MediaStream([systemAudioTracks[0]])
               );
-              systemSource.connect(destinationNode);
+              systemSource.connect(mixerNode);
 
               systemAudioTracks[0].addEventListener("ended", () => {
                 console.info("Pista de audio del sistema finalizada.");
               });
             } else {
-              alert("Aviso: No se seleccionó 'Compartir audio' en el diálogo. Solo se capturará el micrófono.");
+              showRecordNotice(
+                "Aviso: No se detectó pista de audio del sistema. En Linux/Chrome, selecciona una 'Pestaña' y activa la casilla 'Compartir audio'. Continuando sólo con micrófono."
+              );
             }
           } catch (displayErr) {
-            console.warn("Captura de sistema omitida:", displayErr);
+            console.warn("Captura de sistema omitida o cancelada:", displayErr);
+            showRecordNotice("Captura de pantalla omitida o cancelada. Grabando sólo micrófono.");
           }
         }
       }
 
-      analyserNode = audioContext.createAnalyser();
-      analyserNode.fftSize = 256;
-      destinationNode.connect(analyserNode);
       startVuMeter();
 
       combinedStream = destinationNode.stream;
@@ -336,7 +374,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     } catch (err) {
       console.error("Error al iniciar grabación:", err);
-      alert(`No se pudo iniciar la grabación: ${err.message || err.name}`);
+      showRecordNotice(`No se pudo iniciar la grabación: ${err.message || err.name}`);
       cleanupAudioContext();
     }
   }
@@ -384,6 +422,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function resetRecordingState() {
     stopRecording();
+    hideRecordNotice();
     postRecordPanel.style.display = "none";
     recordedBlob = null;
     recordedChunks = [];
